@@ -9,6 +9,9 @@ import java.io.Serializable;
  * Predicate compares tuples to a specified Field value.
  */
 public class Predicate implements Serializable {
+    private Op op;
+    private int fieldNum;
+    private Field operand;
 
     private static final long serialVersionUID = 1L;
 
@@ -59,6 +62,9 @@ public class Predicate implements Serializable {
      */
     public Predicate(int field, Op op, Field operand) {
         // some code goes here
+        this.op = op;
+        this.fieldNum = field;
+        this.operand = operand;
     }
 
     /**
@@ -67,7 +73,7 @@ public class Predicate implements Serializable {
     public int getField()
     {
         // some code goes here
-        return -1;
+        return fieldNum;
     }
 
     /**
@@ -76,7 +82,7 @@ public class Predicate implements Serializable {
     public Op getOp()
     {
         // some code goes here
-        return null;
+        return op;
     }
     
     /**
@@ -85,7 +91,7 @@ public class Predicate implements Serializable {
     public Field getOperand()
     {
         // some code goes here
-        return null;
+        return operand;
     }
     
     /**
@@ -100,7 +106,7 @@ public class Predicate implements Serializable {
      */
     public boolean filter(Tuple t) {
         // some code goes here
-        return false;
+        return t.getField(fieldNum).compare(op, operand);
     }
 
     /**
@@ -109,6 +115,6 @@ public class Predicate implements Serializable {
      */
     public String toString() {
         // some code goes here
-        return "";
+        return "Predicate [op=" + op.toString() + ", fieldNum=" + fieldNum + ", operand=" + operand.toString() + "]";
     }
 }

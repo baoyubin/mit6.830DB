@@ -1,0 +1,11 @@
+{
+    "java.dependency.packagePresentation": "hierarchical",
+    "java.project.referencedLibraries": {
+        "include": [
+            "lib/**/*.jar"
+        ],
+        "exclude": [
+            "d:\\simpledb\\lib\\junit-4.13.1.jar"
+        ]
+    }
+}
