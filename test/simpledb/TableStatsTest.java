@@ -127,8 +127,9 @@ public class TableStatsTest extends SimpleDbTestBase {
 		TableStats s = new TableStats(this.tableId, IO_COST);
 		
 		for (int col = 0; col < 10; col++) {
+			double a;
 			Assert.assertEquals(0.0, s.estimateSelectivity(col, Predicate.Op.EQUALS, aboveMax), 0.001);			
-			Assert.assertEquals(1.0/32.0, s.estimateSelectivity(col, Predicate.Op.EQUALS, halfMaxMin), 0.015);
+			Assert.assertEquals(1.0/32.0,  a = s.estimateSelectivity(col, Predicate.Op.EQUALS, halfMaxMin), 0.015);
 			Assert.assertEquals(0, s.estimateSelectivity(col, Predicate.Op.EQUALS, belowMin), 0.001);
 
 			Assert.assertEquals(1.0, s.estimateSelectivity(col, Predicate.Op.NOT_EQUALS, aboveMax), 0.001);

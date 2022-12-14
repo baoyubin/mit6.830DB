@@ -85,10 +85,10 @@ public class Insert extends Operator {
      * instances of BufferPool is available via Database.getBufferPool(). Note
      * that insert DOES NOT need check to see if a particular tuple is a
      * duplicate before inserting it.
-     * 将从child读取的元组插入到构造函数指定的tableId中。
-     * 它返回一个包含插入记录数的单字段元组。插入应通过BufferPool传递。
-     * BufferPool的实例可通过Database.getBufferPool（）获得。
-     * 请注意，insert不需要在插入特定元组之前检查它是否重复。
+     * 
+     * 
+     * 
+     * 
      * @return A 1-field tuple containing the number of inserted records, or
      *         null if called more than once.
      * @see Database#getBufferPool

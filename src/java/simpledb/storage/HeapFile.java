@@ -147,17 +147,22 @@ public class HeapFile implements DbFile {
             try {
                 page = (HeapPage) Database.getBufferPool().getPage(tid, pageId, Permissions.READ_WRITE);
                 if (page.getNumEmptySlots() == 0) {
+                    System.out.println("[unsafeReleasePage] : " + tid + " " + pageId);
+                    Database.getBufferPool().unsafeReleasePage(tid, pageId);
                     continue;
                 }
             } catch (IllegalArgumentException e) {
-                page = new HeapPage(pageId, HeapPage.createEmptyPageData());
+
+                page = new HeapPage(pageId, HeapPage.createEmptyPageData());  
                 writePage(page);
                 page = (HeapPage) Database.getBufferPool().getPage(tid, pageId, Permissions.READ_WRITE);
+            
             }   
             break;
         }
         
         page.insertTuple(t);
+
         return Collections.singletonList(page);
     }
 

@@ -1,15 +1,20 @@
 package simpledb.optimizer;
 
 import simpledb.common.Database;
+import simpledb.common.DbException;
 import simpledb.common.Type;
 import simpledb.execution.Predicate;
 import simpledb.execution.SeqScan;
 import simpledb.storage.*;
 import simpledb.transaction.Transaction;
+import simpledb.transaction.TransactionAbortedException;
+import simpledb.transaction.TransactionId;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -20,6 +25,17 @@ import java.util.concurrent.ConcurrentMap;
  * This class is not needed in implementing lab1 and lab2.
  */
 public class TableStats {
+    private int tableid;
+    private int ioCostPerPage;
+    private Map<Integer, IntHistogram> integerIntHistogramMap;
+    private Map<Integer, StringHistogram> stringIntHistogramMap;
+    private HashMap<Integer,Integer> maxVal;
+    private HashMap<Integer,Integer> minVal;
+    private TupleDesc tupleDesc;
+    private int pageNum;
+    private int tupleNum;
+
+    
 
     private static final ConcurrentMap<String, TableStats> statsMap = new ConcurrentHashMap<>();
 
@@ -87,7 +103,95 @@ public class TableStats {
         // necessarily have to (for example) do everything
         // in a single scan of the table.
         // some code goes here
+        this.tableid = tableid;
+        this.ioCostPerPage = ioCostPerPage;
+
+        DbFile dbFile = Database.getCatalog().getDatabaseFile(tableid);
+        this.pageNum = ((HeapFile)dbFile).numPages();
+        this.tupleDesc = dbFile.getTupleDesc();
+        int tupleFieldsLen = tupleDesc.numFields();
+        this.maxVal = new HashMap<>();
+        this.minVal = new HashMap<>();
+
+        this.integerIntHistogramMap = new HashMap<>();
+        this.stringIntHistogramMap = new HashMap<>();
+
+        DbFileIterator dbFileIterator= dbFile.iterator(new TransactionId());
+        try {
+            dbFileIterator.open();
+            while (dbFileIterator.hasNext()){
+                Tuple tuple = dbFileIterator.next();
+                this.tupleNum++;
+                for (int i=0;i < tupleFieldsLen; i++){
+                    if (tupleDesc.getFieldType(i) == Type.INT_TYPE){
+                        Integer fieldInteger = ((IntField) tuple.getField(i)).getValue();
+                        maxVal.put(i, Integer.max(maxVal.getOrDefault(i, Integer.MIN_VALUE), fieldInteger) );
+                        minVal.put(i, Integer.min(minVal.getOrDefault(i, Integer.MAX_VALUE), fieldInteger) );
+                    }
+                }
+            }
+            
+        } catch (NoSuchElementException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (DbException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (TransactionAbortedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        for (int i = 0; i < tupleFieldsLen; i++) {
+            if (tupleDesc.getFieldType(i) == Type.INT_TYPE){
+                IntHistogram intHistogram = new IntHistogram(NUM_HIST_BINS, minVal.get(i), maxVal.get(i));
+                integerIntHistogramMap.put(i, intHistogram);
+            }else{
+                StringHistogram stringHistogram = new StringHistogram(NUM_HIST_BINS);
+                stringIntHistogramMap.put(i, stringHistogram);
+            }
+        }
+        
+        try {
+            dbFileIterator.rewind();
+            while (dbFileIterator.hasNext()){
+                Tuple tuple = dbFileIterator.next();
+                for (int i=0;i < tupleFieldsLen; i++){
+                    if (tupleDesc.getFieldType(i) == Type.INT_TYPE){
+                        IntHistogram intHistogram = integerIntHistogramMap.get(i);
+                        Integer fieldInteger = ((IntField) tuple.getField(i)).getValue();
+                        intHistogram.addValue(fieldInteger);
+                    }else{
+                        StringHistogram stringHistogram = stringIntHistogramMap.get(i);
+                        String fString = ((StringField)tuple.getField(i)).getValue();
+                        stringHistogram.addValue(fString);
+                    }
+                }
+            }
+            dbFileIterator.close();
+        } catch (DbException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (TransactionAbortedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }    
+            
+        // for (int i = 0; i < tupleFieldsLen; i++) {
+        //     if (tupleDesc.getFieldType(i) == Type.INT_TYPE){
+        //         IntHistogram intHistogram = integerIntHistogramMap.get(i);
+        //         System.out.print(intHistogram.toString());
+        //         System.out.println();
+        //     }else{
+                
+        //         StringHistogram stringHistogram = stringIntHistogramMap.get(i);
+        //         System.out.print(stringHistogram.toString());
+        //         System.out.println("==========");
+        //     }
+        // }
     }
+
+
 
     /**
      * Estimates the cost of sequentially scanning the file, given that the cost
@@ -103,7 +207,8 @@ public class TableStats {
      */
     public double estimateScanCost() {
         // some code goes here
-        return 0;
+        //may be 2.0 * pageNum * ioCostPerPage
+        return 1.0 * pageNum * ioCostPerPage;
     }
 
     /**
@@ -117,7 +222,7 @@ public class TableStats {
      */
     public int estimateTableCardinality(double selectivityFactor) {
         // some code goes here
-        return 0;
+        return (int) (this.tupleNum * selectivityFactor);
     }
 
     /**
@@ -132,7 +237,11 @@ public class TableStats {
      * */
     public double avgSelectivity(int field, Predicate.Op op) {
         // some code goes here
-        return 1.0;
+        if (integerIntHistogramMap.containsKey(field)){
+            return integerIntHistogramMap.get(field).avgSelectivity();
+        }else{
+            return stringIntHistogramMap.get(field).avgSelectivity();
+        }
     }
 
     /**
@@ -150,7 +259,12 @@ public class TableStats {
      */
     public double estimateSelectivity(int field, Predicate.Op op, Field constant) {
         // some code goes here
-        return 1.0;
+        
+        if (integerIntHistogramMap.containsKey(field)){
+            return integerIntHistogramMap.get(field).estimateSelectivity(op, ((IntField)constant).getValue() );
+        }else{
+            return stringIntHistogramMap.get(field).estimateSelectivity(op, ((StringField)constant).getValue() );
+        }
     }
 
     /**
@@ -158,7 +272,7 @@ public class TableStats {
      * */
     public int totalTuples() {
         // some code goes here
-        return 0;
+        return tupleNum;
     }
 
 }

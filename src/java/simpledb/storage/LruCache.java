@@ -6,7 +6,7 @@ import java.util.Map;
 
 public class LruCache<K, V>  {
     private Map<K,DLinkedNode> pageCache;
-    public ArrayList<K> getPageIdList() {
+    public synchronized ArrayList<K> getPageIdList() {
         ArrayList<K> list = new ArrayList<>();
         for (K k: pageCache.keySet()){
             list.add(k);
@@ -14,7 +14,7 @@ public class LruCache<K, V>  {
         return list;
     }
 
-    public ArrayList<V> getPageList() {
+    public synchronized ArrayList<V> getPageList() {
         ArrayList<V> list = new ArrayList<>();
         DLinkedNode dLinkedNode = tail.prev;
         while (dLinkedNode != head){
@@ -26,7 +26,7 @@ public class LruCache<K, V>  {
 
 
     private int size = 0;
-    public int getSize() {
+    public synchronized int getSize() {
         return size;
     }
 
@@ -61,7 +61,7 @@ public class LruCache<K, V>  {
 
     }
 
-    public V get(K key) {
+    public synchronized V get(K key) {
         DLinkedNode node = pageCache.get(key);
         if (node == null) {
             return null;
@@ -71,7 +71,7 @@ public class LruCache<K, V>  {
         return node.value;
     }
     
-    public void put(K key, V value) {
+    public synchronized void put(K key, V value) {
         DLinkedNode node = pageCache.get(key);
         if (node == null) {     
             DLinkedNode newNode = new DLinkedNode(key, value);
@@ -113,17 +113,17 @@ public class LruCache<K, V>  {
     }
 
 
-    public V getLastEvictPage(){
-        if(this.size == 0) return null;
-        DLinkedNode del = tail.prev;
-        return del.value;
-    }
+    // public synchronized V getLastEvictPage(){
+    //     if(this.size == 0) return null;
+    //     DLinkedNode del = tail.prev;
+    //     return del.value;
+    // }
 
-    public V getPage(K pid){
-        if(this.size == 0) return null;
-        DLinkedNode ans =  pageCache.get(pid);
-        return ans.value;
-    }
+    // public synchronized V getPage(K pid){
+    //     if(this.size == 0) return null;
+    //     DLinkedNode ans =  pageCache.get(pid);
+    //     return ans.value;
+    // }
 
     private V evictPage(){
         if(this.size == 0) return null;
@@ -134,7 +134,7 @@ public class LruCache<K, V>  {
     }
 
 
-    public V evictPage(K pid){
+    public synchronized V evictPage(K pid){
         if(this.size == 0) return null;
         DLinkedNode del =  pageCache.get(pid);
         if (del == null) return null;

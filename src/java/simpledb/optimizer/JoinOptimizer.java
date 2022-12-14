@@ -130,7 +130,8 @@ public class JoinOptimizer {
             // HINT: You may need to use the variable "j" if you implemented
             // a join algorithm that's more complicated than a basic
             // nested-loops join.
-            return -1.0;
+            
+            return cost1 + card1 * cost2 + card1 * card2 ;
         }
     }
 
@@ -176,7 +177,38 @@ public class JoinOptimizer {
                                                    Map<String, Integer> tableAliasToId) {
         int card = 1;
         // some code goes here
+        switch (joinOp){
+            case EQUALS:
+                if (t1pkey && t2pkey){
+                    card = Math.min(card1, card2);
+                }else if(t1pkey){
+                    card = card2;
+                }else if(t2pkey){
+                    card = card1;
+                }else{
+                    card = Math.max(card2, card1);
+                }
+                break;
+            default:
+                card = (int) (card2 * card1 * 0.3);
+                break;
+        }                                        
+
         return card <= 0 ? 1 : card;
+    }
+
+    private <T> void dfs(int size, List<T> v, Set<Set<T>> ans,int idx, Set<T> set){
+        if (set.size() == size) {
+            ans.add(new HashSet<>(set)); 
+            return;
+        }
+        if (v.size() - idx + set.size() < size) return;
+
+        for (int i = idx; i < v.size(); i++){
+            set.add(v.get(i));
+            dfs(size, v, ans,i+1,set);
+            set.remove(v.get(i));
+        }
     }
 
     /**
@@ -191,25 +223,29 @@ public class JoinOptimizer {
      */
     public <T> Set<Set<T>> enumerateSubsets(List<T> v, int size) {
         Set<Set<T>> els = new HashSet<>();
-        els.add(new HashSet<>());
+        //  els.add(new HashSet<>());
         // Iterator<Set> it;
-        // long start = System.currentTimeMillis();
+        //long start = System.currentTimeMillis();
 
-        for (int i = 0; i < size; i++) {
-            Set<Set<T>> newels = new HashSet<>();
-            for (Set<T> s : els) {
-                for (T t : v) {
-                    Set<T> news = new HashSet<>(s);
-                    if (news.add(t))
-                        newels.add(news);
-                }
-            }
-            els = newels;
-        }
+        dfs(size, v, els, 0, new HashSet<>());
+        // for (int i = 0; i < size; i++) {
+        //     Set<Set<T>> newels = new HashSet<>();
+        //     for (Set<T> s : els) {
+        //         for (T t : v) {
+        //             Set<T> news = new HashSet<>(s);
+        //             if (news.add(t))
+        //                 newels.add(news);
+        //         }
+        //     }
+        //     els = newels;
+        // }
 
+        //long end = System.currentTimeMillis();
+        //System.out.println((end-start));
         return els;
 
     }
+
 
     /**
      * Compute a logical, reasonably efficient join on the specified tables. See
@@ -238,7 +274,36 @@ public class JoinOptimizer {
 
         // some code goes here
         //Replace the following
-        return joins;
+        PlanCache planCache = new PlanCache();
+        CostCard bestCostCard = new CostCard();
+        int size = joins.size();
+        for(int i=1; i<=size; i++){
+            
+            Set<Set<LogicalJoinNode>> subsets = this.enumerateSubsets(this.joins, i);
+
+            for (Set<LogicalJoinNode> subset : subsets){
+                bestCostCard = new CostCard();
+                double bestCostSoFar = Double.MAX_VALUE;
+                for (LogicalJoinNode remJoinNode : subset){
+
+                    CostCard costCard = computeCostAndCardOfSubplan(stats, filterSelectivities, remJoinNode, subset, bestCostSoFar, planCache);
+                    if (costCard == null){
+                        continue;
+                    }
+                    bestCostCard = costCard;
+                    bestCostSoFar = costCard.cost;
+                }
+                if(bestCostSoFar != Double.MAX_VALUE){
+                    planCache.addPlan(subset,bestCostCard.cost,bestCostCard.card, bestCostCard.plan);
+                }
+            }
+        }
+
+        if (explain){
+            printJoins(joins, planCache, stats, filterSelectivities);
+        }
+        return bestCostCard.plan;
+
     }
 
     // ===================== Private Methods =================================
